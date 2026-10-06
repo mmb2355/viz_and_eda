@@ -1,0 +1,74 @@
+---
+title: "Visualization"
+output: github_document
+date: "2026-10-01"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(ggridges)
+
+library(p8105.datasets)
+data("weather_df")
+```
+
+now we have everything we need
+
+let's make a scatterplot
+
+```{r}
+weather_df |>
+  ggplot(aes(x = tmax, y = tmin, color = name)) +
+  geom_point() +
+  labs(
+    title = "Temperature (Max vs Min)",
+    x = "Max Temperature (C)",
+    y = "Min Temperature (C)",
+    color = "Location",
+    caption = "Data from NDAA for three weather stations."
+  )
+```
+
+let's try other scales
+
+```{r}
+weather_df |>
+  ggplot(aes(x = tmax, y = tmin, color = name)) +
+  geom_point() +
+  labs(
+    title = "Temperature (Max vs Min)",
+    x = "Max Temperature (C)",
+    y = "Min Temperature (C)",
+    color = "Location",
+    caption = "Data from NDAA for three weather stations."
+  ) + 
+  scale_x_continuous(
+    breaks = c(-10, 0, 15),
+    labels = c("-10 C,", "0", "Fifteen")
+  ) +
+  scale_y_continuous(
+    trans = "sqrt",
+    position = "right"
+  )
+```
+
+let's look at color
+
+```{r}
+weather_df |>
+  ggplot(aes(x = tmax, y = tmin, color = name)) +
+  geom_point() +
+  scale_color_hue(h = c(100, 300))
+```
+
+```{r}
+weather_df |>
+  ggplot(aes(x = tmax, y = tmin, color = name)) +
+  geom_point() +
+  viridis::scale_color_viridis(
+    name = "Location",
+    discrete = TRUE
+  )
+```
