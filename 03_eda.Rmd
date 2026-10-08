@@ -1,0 +1,244 @@
+---
+title: "Numerical EDA"
+output: github_document
+date: "2026-10-08"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include = FALSE}
+library(tidyverse)
+library(p8105.datasets)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+load weather data
+
+```{r}
+data("weather_df")
+
+weather_df = 
+  weather_df |> 
+  mutate(
+    month = lubridate::floor_date(date, unit = "month")
+  )
+```
+
+now we have everything we need
+
+```{r}
+weather_df |> 
+  filter(prcp > 0) |> 
+  ggplot(aes(x = prcp)) +
+  geom_histogram()
+```
+
+```{r}
+weather_df |> 
+  filter(prcp > 0)
+```
+
+```{r}
+weather_df |> 
+  filter(tmax >= 20, tmax <= 30) |> 
+  ggplot(aes(x = tmax, y = tmin, color = name, shape = name)) +
+  geom_point()
+```
+
+## `group_by`
+
+```{r}
+weather_df |> 
+  group_by(name, month)
+```
+
+## `summerize()`
+
+```{r}
+weather_df |> 
+  group_by(name) |> 
+  summarize(count = n())
+```
+
+```{r}
+weather_df |> 
+  group_by(name, month) |> 
+  summarize(count = n())
+```
+
+```{r}
+weather_df |> 
+  group_by(month) |> 
+  summarize(
+    count = n(),
+    n_days = n_distinct(date))
+```
+
+don't do this
+
+```{r}
+weather_df |> 
+  pull(tmax) |> 
+  summary()
+```
+
+do this instead
+
+```{r}
+weather_df |> 
+  group_by(name) |> 
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE),
+    median_tmax = median(tmax, na.rm = TRUE),
+    sd_prcp = sd(prcp, na.rm = TRUE),
+    q95_prcp = quantile(prcp, 0.95, na.rm = TRUE)
+  ) |> 
+  knitr::kable(digits = 2)
+```
+
+knitr::kable gives table
+
+```{r}
+weather_df |> 
+  group_by(name, month) |> 
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) |> 
+  pivot_wider(
+    names_from = name,
+    values_from = mean_tmax
+  ) |> 
+  knitr::kable(digits = 2)
+```
+
+```{r}
+weather_df |> 
+  group_by(name, month) |> 
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) |> 
+  ggplot(aes(x = month, y = mean_tmax, color = name)) +
+  geom_point() + 
+  geom_line()
+```
+
+```{r}
+weather_df |> 
+  mutate(center_tmax = tmax - mean(tmax, na.rm = TRUE)) |> 
+  ggplot(aes(x = date, y = center_tmax, color = name)) +
+  geom_point()
+```
+
+## what about "window" functions
+
+try to rank things
+
+```{r}
+weather_df |> 
+  group_by(name, month) |> 
+  mutate(temp_rank = min_rank(desc(tmax))) |> 
+  filter(temp_rank < 2)
+```
+
+min_rank ranks from smallest value
+
+## lead and lag
+
+```{r}
+weather_df |> 
+  group_by(name) |> 
+  mutate(
+    lagged_tmax = lag(tmax, 3),
+    lead_tmax = lead(tmax)
+  ) 
+```
+
+* lag takes value previous row and pastes it to next column
+* the first lag column is always NA
+* lead does the opposite
+
+```{r}
+weather_df |> 
+  group_by(name) |> 
+  mutate(
+    temp_change = tmax - lag(tmax)
+  ) |> 
+  summarize(
+    mean_temp_change = mean(temp_change, na.rm = TRUE),
+    sd_temp_change = sd(temp_change, na.rm = TRUE)
+  )
+```
+
+## revisit some examples
+
+```{r}
+pulse_df =
+  haven::read_sas("public_pulse_data.sas7bdat") |> 
+  janitor::clean_names() |> 
+  pivot_longer(
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit",
+    names_prefix = "bdi_score_",
+    values_to = "bdi"
+  ) |> 
+  mutate(
+    visit = replace(visit, visit == "bl", "00m")
+  )
+```
+
+* before tidying, check to see if you need to pivot (run up to janitor::clean_names)
+* names_to = what you want to make the variable
+* names_prefix = the similarities of the variable by a prefix, what you want to change to names_to
+* values_to = name of variable value
+* replace is for matching prefix/suffix with other variables
+
+```{r}
+pulse_df |> 
+  group_by(visit) |> 
+  summarize(
+    BDI_mean = mean(bdi,na.rm = TRUE),
+    BDI_median = median(bdi, na.rm = TRUE)
+  ) |> 
+  knitr::kable(digits = 2)
+```
+
+```{r}
+pups_df =
+  read_csv("FAS_pups.csv", skip = 3, na = c("", ".", "NA")) |> 
+  janitor::clean_names() |> 
+  mutate(sex = recode(sex, `1` = "male", `2` = "female")) 
+
+litters_df =
+  read_csv("FAS_litters.csv", na = c("", ".", "NA")) |> 
+  janitor::clean_names() |> 
+  separate(group, into = c("dose", "day_of_tx"), 3)
+
+fas_df =
+  left_join(pups_df, litters_df, by = "litter_number")
+
+fas_df |> 
+  group_by(dose, day_of_tx) |> 
+  drop_na(dose) |> 
+  summarize(
+    mean_pivot = mean(pd_pivot, na.rm = TRUE)) |> 
+  pivot_wider(
+    names_from = dose, 
+    values_from = mean_pivot) |> 
+  knitr::kable(digits = 2)
+```
+
